@@ -126,5 +126,4 @@ Opens `detection_report.html` with full scan results.
 ## 👩‍💻 Author
 **Sneha Chhatri**
 Cybersecurity Enthusiast | Final Year Student
-[GitHub](https://github.com/snehachhatri)
-[LinkedIn] (https://www.linkedin.com/in/sneha-chhatri-0ab424405/?skipRedirect=true)
+[GitHub](https://github.com/snehachhatri) • [LinkedIn](https://www.linkedin.com/in/sneha-chhatri-0ab424405/)
